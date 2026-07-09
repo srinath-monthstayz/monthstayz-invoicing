@@ -1,21 +1,25 @@
+import { Fragment } from "react";
 import { getTrip } from "@/lib/trips";
 import { company, fmtDate, money } from "@/lib/format";
 import { CHARGE_STATUS } from "@/lib/schema";
+import { buildLedger, buildSections } from "@/lib/sections";
 import DocShell from "@/components/DocShell";
 
 export const dynamic = "force-dynamic";
 
 /**
- * RECEIPT / STATEMENT — issued after every payment, and as the final
- * statement at the end of the stay. Lists every payment with its date in a
- * running table, all charges with paid dates, and the remaining balance.
- * When the balance is zero it reads as the final receipt for the whole stay.
+ * RECEIPT / STATEMENT — generated as payments come in, and as the final
+ * statement at the end of the stay. Lists every payment (from the Payments
+ * ledger and money paid directly against a charge) with its date in one
+ * merged, running table, plus every charge with its paid/unpaid status.
  */
 export default async function ReceiptPage({ params }: { params: { id: string } }) {
   const trip = await getTrip(params.id);
   const co = company();
   const t = trip.totals;
   const settled = t.balance <= 0;
+  const sections = buildSections(trip);
+  const ledger = buildLedger(trip);
 
   return (
     <DocShell backHref={`/trips/${trip.id}`}>
@@ -30,7 +34,9 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
           </p>
         </div>
         <div className="text-right text-sm">
+          <img src={co.logoUrl} alt={co.name} className="mb-1 ml-auto h-10" />
           <div className="text-lg font-bold">{co.name}</div>
+          <div className="text-xs text-slate-500">{co.tagline}</div>
           {co.address && <div>{co.address}</div>}
           {co.email && <div>{co.email}</div>}
           {co.phone && <div>{co.phone}</div>}
@@ -58,39 +64,47 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
         </div>
       </section>
 
-      {/* What the stay costs */}
+      {/* What the stay costs, by section, with paid/unpaid status */}
       <section className="mb-6">
         <h2 className="mb-2 text-sm font-semibold uppercase text-slate-500">Summary of charges</h2>
         <table className="w-full text-sm">
           <tbody>
-            <tr className="border-b border-slate-100">
-              <td className="py-1">Accommodation (master trip)</td>
-              <td className="py-1 text-right">{money(trip.agreedCost)}</td>
-            </tr>
-            {trip.subtrips.map((s) => (
-              <tr key={s.id} className="border-b border-slate-100">
-                <td className="py-1">Extension {fmtDate(s.arrivalDate)} → {fmtDate(s.checkoutDate)}</td>
-                <td className="py-1 text-right">{money(s.agreedCost)}</td>
-              </tr>
-            ))}
-            {trip.charges.map((c) => (
-              <tr key={c.id} className="border-b border-slate-100">
-                <td className="py-1">
-                  {c.description}
-                  <span
-                    className={
-                      c.status === CHARGE_STATUS.PAID
-                        ? "ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-800"
-                        : "ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800"
-                    }
-                  >
-                    {c.status === CHARGE_STATUS.PAID
-                      ? `Paid${c.datePaid ? " " + fmtDate(c.datePaid) : ""}`
-                      : "To pay"}
-                  </span>
-                </td>
-                <td className="py-1 text-right">{money(c.amount)}</td>
-              </tr>
+            {sections.map((s) => (
+              <Fragment key={s.key}>
+                {s.key !== "master" && (
+                  <tr>
+                    <td colSpan={2} className="pt-3 text-xs font-semibold uppercase text-slate-400">
+                      {s.label} · {fmtDate(s.arrivalDate)} → {fmtDate(s.checkoutDate)}
+                    </td>
+                  </tr>
+                )}
+                <tr className="border-b border-slate-100">
+                  <td className="py-1">
+                    {s.key === "master" ? "Accommodation" : "Extension accommodation"}
+                  </td>
+                  <td className="py-1 text-right">{money(s.agreedCost)}</td>
+                </tr>
+                {s.charges.map((c) => (
+                  <tr key={c.id} className="border-b border-slate-100">
+                    <td className="py-1">
+                      {c.description}
+                      <span
+                        className={
+                          c.status === CHARGE_STATUS.FULLY_PAID
+                            ? "ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-800"
+                            : c.status === CHARGE_STATUS.PARTIALLY_PAID
+                              ? "ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800"
+                              : "ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600"
+                        }
+                      >
+                        {c.status}
+                        {c.paid > 0 && c.datePaid ? ` · ${fmtDate(c.datePaid)}` : ""}
+                      </span>
+                    </td>
+                    <td className="py-1 text-right">{money(c.amount)}</td>
+                  </tr>
+                ))}
+              </Fragment>
             ))}
             <tr className="border-b border-slate-100">
               <td className="py-1">Security deposit (refundable)</td>
@@ -104,7 +118,7 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
         </table>
       </section>
 
-      {/* Every payment, dated */}
+      {/* Every payment, dated — merged across the Payments ledger and charges paid directly */}
       <section className="mb-6">
         <h2 className="mb-2 text-sm font-semibold uppercase text-slate-500">Payments received</h2>
         <table className="w-full text-sm">
@@ -112,7 +126,7 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
             <tr className="border-b-2 border-slate-300 text-left text-slate-600">
               <th className="py-2">#</th>
               <th className="py-2">Date</th>
-              <th className="py-2">Type</th>
+              <th className="py-2">Description</th>
               <th className="py-2">Method</th>
               <th className="py-2">Reference</th>
               <th className="py-2 text-right">Amount</th>
@@ -122,22 +136,22 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
           <tbody>
             {(() => {
               let running = t.grandTotal;
-              return trip.payments.map((p, i) => {
-                running -= p.amount;
+              return ledger.map((entry, i) => {
+                running -= entry.amount;
                 return (
-                  <tr key={p.id} className="border-b border-slate-100">
+                  <tr key={entry.id} className="border-b border-slate-100">
                     <td className="py-2">{i + 1}</td>
-                    <td className="py-2">{fmtDate(p.date)}</td>
-                    <td className="py-2">{p.type || "Payment"}</td>
-                    <td className="py-2">{p.method || "—"}</td>
-                    <td className="py-2">{p.reference || "—"}</td>
-                    <td className="py-2 text-right font-medium">{money(p.amount)}</td>
+                    <td className="py-2">{fmtDate(entry.date)}</td>
+                    <td className="py-2">{entry.label}</td>
+                    <td className="py-2">{entry.method || "—"}</td>
+                    <td className="py-2">{entry.reference || "—"}</td>
+                    <td className="py-2 text-right font-medium">{money(entry.amount)}</td>
                     <td className="py-2 text-right text-slate-500">{money(Math.max(running, 0))}</td>
                   </tr>
                 );
               });
             })()}
-            {trip.payments.length === 0 && (
+            {ledger.length === 0 && (
               <tr>
                 <td colSpan={7} className="py-4 text-center text-slate-500">
                   No payments recorded yet.
@@ -157,9 +171,7 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
         </table>
       </section>
 
-      <section
-        className={`rounded-lg p-4 text-sm ${settled ? "bg-emerald-50" : "bg-brand-light"}`}
-      >
+      <section className={`rounded-lg p-4 text-sm ${settled ? "bg-emerald-50" : "bg-brand-light"}`}>
         <div className="flex justify-between py-1">
           <span>Total (incl. refundable deposit)</span>
           <span>{money(t.grandTotal)}</span>
@@ -184,7 +196,7 @@ export default async function ReceiptPage({ params }: { params: { id: string } }
       </section>
 
       <footer className="mt-8 border-t border-slate-200 pt-4 text-xs text-slate-500">
-        This receipt lists all payments received for the stay including extensions and services.
+        This receipt lists all payments received for the stay including extensions and services.{" "}
         {co.name} — {co.email}
       </footer>
     </DocShell>

@@ -19,8 +19,10 @@ export function fmtDate(iso: string): string {
 export function company() {
   return {
     name: process.env.COMPANY_NAME ?? "MonthStayz Thailand",
+    tagline: process.env.COMPANY_TAGLINE ?? "Experience Luxury Living in Thailand",
     address: process.env.COMPANY_ADDRESS ?? "",
     email: process.env.COMPANY_EMAIL ?? "",
     phone: process.env.COMPANY_PHONE ?? "",
+    logoUrl: process.env.COMPANY_LOGO_URL ?? "/logo.avif",
   };
 }

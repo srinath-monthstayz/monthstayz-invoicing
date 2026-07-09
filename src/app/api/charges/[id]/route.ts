@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteRecord, updateRecord } from "@/lib/airtable";
-import { CHARGE, CHARGE_STATUS, TABLES } from "@/lib/schema";
+import { CHARGE, TABLES } from "@/lib/schema";
+import { classifyCharge } from "@/lib/chargeStatus";
 
-/** PATCH /api/charges/:id — edit a charge, or mark it Paid */
+/** PATCH /api/charges/:id — edit a charge, including recording a paid amount/date */
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json();
@@ -10,15 +11,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.description !== undefined) fields[CHARGE.lineItems] = body.description;
     if (body.amount !== undefined) fields[CHARGE.amountToBePaid] = Number(body.amount);
     if (body.serviceType !== undefined) fields[CHARGE.serviceType] = body.serviceType || null;
-    if (body.status !== undefined) fields[CHARGE.paymentStatus] = body.status;
     if (body.dueDate !== undefined) fields[CHARGE.dueDate] = body.dueDate || null;
     if (body.notes !== undefined) fields[CHARGE.notes] = body.notes;
+    if (body.paidAmount !== undefined) fields[CHARGE.actualPaid] = Number(body.paidAmount);
+    if (body.datePaid !== undefined) fields[CHARGE.datePaid] = body.datePaid || null;
 
-    // "Mark paid" shortcut: sets status, paid amount and paid date together
-    if (body.markPaid) {
-      fields[CHARGE.paymentStatus] = CHARGE_STATUS.PAID;
-      if (body.paidAmount !== undefined) fields[CHARGE.actualPaid] = Number(body.paidAmount);
-      fields[CHARGE.datePaid] = body.datePaid || new Date().toISOString().slice(0, 10);
+    if (body.status !== undefined) {
+      fields[CHARGE.paymentStatus] = body.status;
+    } else if (body.paidAmount !== undefined && body.amount !== undefined) {
+      // Caller didn't compute a status — derive it so it never drifts from the amounts.
+      fields[CHARGE.paymentStatus] = classifyCharge(Number(body.amount), Number(body.paidAmount));
     }
 
     const record = await updateRecord(TABLES.SERVICES, params.id, fields);

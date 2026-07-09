@@ -7,15 +7,24 @@ body {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 16mm;
+  }
   .no-print {
     display: none !important;
   }
+  html,
   body {
     background: white;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    color-adjust: exact;
   }
   .print-page {
     box-shadow: none !important;
     margin: 0 !important;
     border: none !important;
+    max-width: none !important;
   }
 }

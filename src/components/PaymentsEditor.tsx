@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { Payment } from "@/lib/trips";
+import type { Payment, Subtrip } from "@/lib/trips";
 import { PAYMENT_METHODS, PAYMENT_TYPES } from "@/lib/schema";
-
-const money = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "THB", maximumFractionDigits: 2, minimumFractionDigits: 0 }).format(n || 0);
+import { money } from "@/lib/format";
 
 type Draft = {
   amount: string;
@@ -14,6 +12,7 @@ type Draft = {
   method: string;
   type: string;
   reference: string;
+  subtripId: string;
 };
 
 const emptyDraft = (): Draft => ({
@@ -22,14 +21,17 @@ const emptyDraft = (): Draft => ({
   method: "Bank transfer",
   type: "Advance",
   reference: "",
+  subtripId: "",
 });
 
 export default function PaymentsEditor({
   tripId,
   payments,
+  subtrips,
 }: {
   tripId: string;
   payments: Payment[];
+  subtrips: Subtrip[];
 }) {
   const router = useRouter();
   const [draft, setDraft] = useState<Draft>(emptyDraft());
@@ -80,6 +82,7 @@ export default function PaymentsEditor({
       method: p.method || "Bank transfer",
       type: p.type || "Advance",
       reference: p.reference,
+      subtripId: "",
     });
   }
 
@@ -116,12 +119,29 @@ export default function PaymentsEditor({
         </select>
       </td>
       <td className="px-2 py-1">
-        <input
-          placeholder="Slip no. / note"
-          className="w-full rounded border border-slate-300 px-2 py-1"
-          value={draft.reference}
-          onChange={(e) => setDraft({ ...draft, reference: e.target.value })}
-        />
+        <div className="flex gap-1">
+          <input
+            placeholder="Slip no. / note"
+            className="w-full rounded border border-slate-300 px-2 py-1"
+            value={draft.reference}
+            onChange={(e) => setDraft({ ...draft, reference: e.target.value })}
+          />
+          {subtrips.length > 0 && (
+            <select
+              className="rounded border border-slate-300 px-1 py-1 text-xs"
+              value={draft.subtripId}
+              onChange={(e) => setDraft({ ...draft, subtripId: e.target.value })}
+              title="Attach to extension"
+            >
+              <option value="">Master trip</option>
+              {subtrips.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name || "Extension"}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
       </td>
       <td className="px-2 py-1">
         <input
@@ -200,7 +220,8 @@ export default function PaymentsEditor({
       </table>
       <p className="mt-2 text-xs text-slate-500">
         Each row is a record in the Airtable <b>Payments</b> table linked to this trip. Enter a
-        refund as a negative amount.
+        refund as a negative amount. &quot;Advance&quot;/&quot;Partial&quot; payments count toward
+        the advance still due; &quot;Balance&quot;/&quot;Full&quot; do not.
       </p>
     </section>
   );

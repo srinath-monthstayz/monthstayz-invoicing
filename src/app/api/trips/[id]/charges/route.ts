@@ -14,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       [CHARGE.masterTrips]: [params.id],
       [CHARGE.lineItems]: body.description,
       [CHARGE.amountToBePaid]: Number(body.amount),
-      [CHARGE.paymentStatus]: body.status ?? CHARGE_STATUS.TO_PAY,
+      [CHARGE.paymentStatus]: body.status ?? CHARGE_STATUS.NOT_PAID,
       [CHARGE.date]: body.date || new Date().toISOString().slice(0, 10),
     };
     if (body.serviceType) fields[CHARGE.serviceType] = body.serviceType;
@@ -23,6 +23,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (body.subtripId) fields[CHARGE.subtrips] = [body.subtripId];
     const record = await createRecord(TABLES.SERVICES, fields);
     revalidatePath(`/trips/${params.id}`);
+    revalidatePath(`/trips/${params.id}/invoice`);
+    revalidatePath(`/trips/${params.id}/receipt`);
     return NextResponse.json({ id: record.id }, { status: 201 });
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 });

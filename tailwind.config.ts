@@ -6,9 +6,9 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: "#0f766e",
-          dark: "#115e59",
-          light: "#f0fdfa",
+          DEFAULT: "#1b3a5c", // MonthStayz navy
+          dark: "#0f2540",
+          light: "#eef3f9",
         },
       },
     },

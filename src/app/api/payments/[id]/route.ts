@@ -13,6 +13,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.type !== undefined) fields[PAYMENT.type] = body.type || null;
     if (body.reference !== undefined) fields[PAYMENT.reference] = body.reference;
     if (body.label !== undefined) fields[PAYMENT.name] = body.label;
+    if (body.subtripId !== undefined && PAYMENT.subtrip) {
+      fields[PAYMENT.subtrip] = body.subtripId ? [body.subtripId] : [];
+    }
     const record = await updateRecord(TABLES.PAYMENTS, params.id, fields);
     return NextResponse.json({ id: record.id });
   } catch (e: any) {
