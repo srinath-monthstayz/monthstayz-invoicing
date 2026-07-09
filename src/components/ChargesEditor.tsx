@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Charge, Subtrip } from "@/lib/trips";
-import { CHARGE_STATUS } from "@/lib/schema";
+import { CHARGE_SERVICE_TYPES, CHARGE_STATUS } from "@/lib/schema";
 import { classifyCharge } from "@/lib/chargeStatus";
 import { money } from "@/lib/format";
 
 type AddDraft = {
   description: string;
+  serviceType: string;
   amount: string;
   date: string;
   dueDate: string;
@@ -17,6 +18,7 @@ type AddDraft = {
 
 type EditDraft = {
   description: string;
+  serviceType: string;
   amount: string;
   paidAmount: string;
   datePaid: string;
@@ -24,6 +26,7 @@ type EditDraft = {
 
 const emptyAddDraft = (): AddDraft => ({
   description: "",
+  serviceType: "",
   amount: "",
   date: new Date().toISOString().slice(0, 10),
   dueDate: "",
@@ -48,7 +51,13 @@ export default function ChargesEditor({
   const router = useRouter();
   const [addDraft, setAddDraft] = useState<AddDraft>(emptyAddDraft());
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editDraft, setEditDraft] = useState<EditDraft>({ description: "", amount: "", paidAmount: "", datePaid: "" });
+  const [editDraft, setEditDraft] = useState<EditDraft>({
+    description: "",
+    serviceType: "",
+    amount: "",
+    paidAmount: "",
+    datePaid: "",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -80,6 +89,7 @@ export default function ChargesEditor({
     setEditingId(c.id);
     setEditDraft({
       description: c.description,
+      serviceType: c.serviceType || "",
       amount: String(c.amount),
       paidAmount: String(c.paid || ""),
       datePaid: c.datePaid || "",
@@ -91,6 +101,7 @@ export default function ChargesEditor({
     const paidAmount = Number(editDraft.paidAmount) || 0;
     await call(`/api/charges/${id}`, "PATCH", {
       description: editDraft.description,
+      serviceType: editDraft.serviceType,
       amount,
       paidAmount,
       datePaid: editDraft.datePaid || (paidAmount > 0 ? new Date().toISOString().slice(0, 10) : null),
@@ -116,6 +127,7 @@ export default function ChargesEditor({
           <tr>
             <th className="px-2 py-1">Added</th>
             <th className="px-2 py-1">Description</th>
+            <th className="px-2 py-1">Type</th>
             <th className="px-2 py-1 text-right">Amount</th>
             <th className="px-2 py-1 text-right">Paid</th>
             <th className="px-2 py-1">Status</th>
@@ -134,6 +146,20 @@ export default function ChargesEditor({
                     value={editDraft.description}
                     onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })}
                   />
+                </td>
+                <td className="px-2 py-1">
+                  <select
+                    className="w-full rounded border border-slate-300 px-2 py-1"
+                    value={editDraft.serviceType}
+                    onChange={(e) => setEditDraft({ ...editDraft, serviceType: e.target.value })}
+                  >
+                    <option value="">—</option>
+                    {CHARGE_SERVICE_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
                 </td>
                 <td className="px-2 py-1">
                   <input
@@ -189,6 +215,7 @@ export default function ChargesEditor({
                     </span>
                   )}
                 </td>
+                <td className="px-2 py-2 text-slate-600">{c.serviceType || "—"}</td>
                 <td className="px-2 py-2 text-right font-medium">{money(c.amount)}</td>
                 <td className="px-2 py-2 text-right text-slate-600">{c.paid ? money(c.paid) : "—"}</td>
                 <td className="px-2 py-2">
@@ -243,6 +270,20 @@ export default function ChargesEditor({
                   </select>
                 )}
               </div>
+            </td>
+            <td className="px-2 py-1">
+              <select
+                className="w-full rounded border border-slate-300 px-2 py-1"
+                value={addDraft.serviceType}
+                onChange={(e) => setAddDraft({ ...addDraft, serviceType: e.target.value })}
+              >
+                <option value="">Select type…</option>
+                {CHARGE_SERVICE_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
             </td>
             <td className="px-2 py-1">
               <input
